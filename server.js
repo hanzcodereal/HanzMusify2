@@ -9,6 +9,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// CORS headers if needed
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -19,6 +20,7 @@ app.use((req, res, next) => {
     next();
 });
 
+// API Routes
 app.all('/api/search', require('./api/search.js'));
 app.all('/api/lyrics', require('./api/lyrics.js'));
 app.all('/api/artist', require('./api/artist.js'));
@@ -26,6 +28,7 @@ app.all('/api/album', require('./api/album.js'));
 app.all('/api/suggest', require('./api/suggest.js'));
 app.all('/api/ytplay', require('./api/ytplay.js'));
 
+// Proxy audio needs to stream in node, bypassing edge function
 app.get('/api/proxy-audio', (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) return res.status(400).send('Missing url parameter');
@@ -48,9 +51,10 @@ app.get('/api/proxy-audio', (req, res) => {
 
     const client = parsed.protocol === 'https:' ? https : http;
     const proxyReq = client.get(targetUrl, options, (proxyRes) => {
+        // Handle potential redirects
         if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
             req.query.url = proxyRes.headers.location;
-            return app._router.handle(req, res);
+            return app._router.handle(req, res); // naive redirect following
         }
 
         res.status(proxyRes.statusCode);
@@ -70,8 +74,10 @@ app.get('/api/proxy-audio', (req, res) => {
     });
 });
 
+// Static files (from public)
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Fallback for SPA routing
 app.use((req, res) => {
     const filePath = path.join(__dirname, 'public', 'index.html');
     
@@ -103,6 +109,7 @@ app.use((req, res) => {
         }
     }
 
+    // Default HTML response (remove favicon when not playing / on home)
     fs.readFile(filePath, 'utf8', (err, html) => {
         if (err) return res.sendFile(filePath);
         let defaultHtml = html
